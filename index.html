@@ -22,6 +22,7 @@
     </nav>
     <div class="top-actions">
       <span id="syncBadge" class="sync-badge">本地模式</span>
+      <button id="accountBtn" class="ghost-btn hidden">账号</button>
       <button id="installBtn" class="ghost-btn hidden">安装</button>
     </div>
   </header>
@@ -129,14 +130,28 @@
 <div id="loginOverlay" class="overlay hidden">
   <div class="login-card">
     <h2>登录学习工作台</h2>
-    <p>电脑和手机使用同一个邮箱登录一次，之后完成状态就能同步。</p>
-    <input id="emailInput" type="email" placeholder="你的邮箱">
-    <button id="loginBtn" class="primary-btn">发送登录链接</button>
+    <p>电脑和手机使用同一个邮箱和密码登录，完成状态会自动同步。</p>
+    <input id="emailInput" type="email" autocomplete="username" placeholder="邮箱">
+    <input id="passwordInput" type="password" autocomplete="current-password" placeholder="密码">
+    <button id="loginBtn" class="primary-btn">登录</button>
     <div id="loginMsg" class="small"></div>
+  </div>
+</div>
+
+<div id="accountOverlay" class="overlay hidden">
+  <div class="login-card">
+    <h2>账号设置</h2>
+    <p>第一次使用密码登录前，请在已经登录的电脑上设置一个密码。</p>
+    <input id="newPasswordInput" type="password" autocomplete="new-password" placeholder="设置新密码（建议至少 8 位）">
+    <button id="savePasswordBtn" class="primary-btn">保存密码</button>
+    <button id="signOutBtn" class="ghost-btn" style="margin-left:8px">退出登录</button>
+    <button id="closeAccountBtn" class="ghost-btn" style="margin-left:8px">关闭</button>
+    <div id="accountMsg" class="small" style="margin-top:10px"></div>
   </div>
 </div>
 
 <script src="./config.js"></script>
 <script type="module" src="./app.js"></script>
+<script type="module" src="./auth-password.js"></script>
 </body>
 </html>
