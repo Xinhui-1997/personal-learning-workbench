@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f7fb">
+  <meta name="description" content="每天 5–8 分钟的个人学习工作台">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg">
+  <link rel="apple-touch-icon" href="./icons/icon.svg">
+  <link rel="stylesheet" href="./styles.css">
+  <title>个人学习工作台</title>
+</head>
+<body>
+<div id="app">
+  <header class="topnav">
+    <div class="brand"><span class="brand-dot"></span><span>个人学习工作台</span></div>
+    <nav class="tabs" aria-label="页面">
+      <button class="tab active" data-view="today">今日</button>
+      <button class="tab" data-view="stats">统计</button>
+      <button class="tab" data-view="sources">来源</button>
+    </nav>
+    <div class="top-actions">
+      <span id="syncBadge" class="sync-badge">本地模式</span>
+      <button id="installBtn" class="ghost-btn hidden">安装</button>
+    </div>
+  </header>
+
+  <main id="todayView" class="view">
+    <section class="date-panel">
+      <div class="date-row">
+        <button id="prevDay" class="icon-btn" aria-label="前一天">‹</button>
+        <div class="date-title">
+          <strong id="dateText"></strong>
+          <span id="dateNote"></span>
+        </div>
+        <button id="todayBtn" class="today-btn">回到今天</button>
+        <div class="calendar-wrap">
+          <button id="calendarBtn" class="icon-btn" aria-label="选择日期">📅</button>
+          <div id="calendarPop" class="calendar-pop">
+            <div class="cal-head">
+              <button id="calPrev" class="cal-nav">‹</button>
+              <strong id="calMonthTitle"></strong>
+              <button id="calNext" class="cal-nav">›</button>
+            </div>
+            <div class="cal-week">
+              <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+            </div>
+            <div id="calGrid" class="cal-grid"></div>
+          </div>
+        </div>
+        <button id="nextDay" class="icon-btn" aria-label="后一天">›</button>
+      </div>
+
+      <div class="segment-wrap">
+        <div id="segments" class="segments"></div>
+        <div id="segmentLabels" class="segment-labels"></div>
+        <div class="day-summary">
+          <span id="progressText">今日完成 0 / 5</span>
+          <span>每部分约 1–2 分钟</span>
+        </div>
+      </div>
+    </section>
+
+    <div id="languageNotice" class="notice">
+      <strong>阅读规则：</strong>Daily English 保持中英双语；物理、心理和科普以中文为主。
+      高质量英文来源可以进入候选池，但默认先翻译、压缩成中文短卡。
+    </div>
+
+    <div id="cards" class="grid"></div>
+  </main>
+
+  <main id="statsView" class="view hidden">
+    <div class="stats-title">
+      <div>
+        <h1>学习统计</h1>
+        <div class="subtle">看趋势，不制造打卡压力。</div>
+      </div>
+      <div id="statsDateRange" class="subtle"></div>
+    </div>
+
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div id="streakNum" class="stat-number c1">0</div>
+        <div class="stat-label">连续有完成(天)</div>
+      </div>
+      <div class="stat-card">
+        <div id="totalNum" class="stat-number c2">0</div>
+        <div class="stat-label">累计完成(项)</div>
+      </div>
+      <div class="stat-card">
+        <div id="weekRate" class="stat-number c3">0%</div>
+        <div class="stat-label">本周完成率</div>
+      </div>
+    </div>
+
+    <section class="stats-panel">
+      <div class="week-main">
+        <div id="donut" class="donut"><span id="donutText">0%</span></div>
+        <div class="week-copy">
+          <h2>本周进度</h2>
+          <p id="weekDescription"></p>
+        </div>
+      </div>
+      <div class="module-week">
+        <div id="dayHead" class="day-head"></div>
+        <div id="moduleRows"></div>
+      </div>
+      <div class="heat-title">最近 14 天完成度</div>
+      <div id="heatmap" class="heatmap"></div>
+    </section>
+  </main>
+
+  <main id="sourcesView" class="view hidden">
+    <div class="stats-title">
+      <div>
+        <h1>内容来源</h1>
+        <div class="subtle">高质量候选池 → Score 筛选 → 每天只展示最适合的一条。</div>
+      </div>
+    </div>
+    <div id="sourceCards" class="source-grid"></div>
+  </main>
+
+  <footer>
+    <span id="modeText">Demo / 本地缓存</span>
+  </footer>
+</div>
+
+<div id="loginOverlay" class="overlay hidden">
+  <div class="login-card">
+    <h2>登录学习工作台</h2>
+    <p>电脑和手机使用同一个邮箱登录一次，之后完成状态就能同步。</p>
+    <input id="emailInput" type="email" placeholder="你的邮箱">
+    <button id="loginBtn" class="primary-btn">发送登录链接</button>
+    <div id="loginMsg" class="small"></div>
+  </div>
+</div>
+
+<script src="./config.js"></script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
