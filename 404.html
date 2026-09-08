@@ -1,0 +1,7 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>返回学习工作台</title>
+<script>
+  const base = location.pathname.split('/').slice(0,2).join('/') + '/';
+  location.replace(location.origin + base);
+</script>

@@ -1,0 +1,18 @@
+{
+  "name": "个人学习工作台",
+  "short_name": "学习工作台",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#f5f7fb",
+  "description": "每天 5–8 分钟，自动筛选并整理英语、物理、心理和科普内容。",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
