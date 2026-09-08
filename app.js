@@ -4,7 +4,8 @@ const BASE=[
 {id:'english',label:'Daily English',icon:'🇬🇧',cls:'english-c'},
 {id:'physics',label:'每日物理',icon:'⚛️',cls:'physics-c'},
 {id:'psych',label:'每日心理',icon:'🧠',cls:'psych-c'},
-{id:'science',label:'每日科普',icon:'🔭',cls:'science-c'}];
+{id:'science',label:'每日科普',icon:'🔭',cls:'science-c'},
+{id:'poetry',label:'每日诗词',icon:'📜',cls:'poetry-c'}];
 const MODULES=BASE.filter(m=>CFG.SHOW_DAILY_TASK!==false||m.id!=='task');
 const $=id=>document.getElementById(id);
 let supabase=null,session=null,currentDate=fmt(new Date()),calendarCursor=parse(currentDate),cards=[],completion={},installPrompt=null;
@@ -28,6 +29,7 @@ function setupUI(){
  $('prevDay').onclick=()=>load(add(currentDate,-1));$('nextDay').onclick=()=>load(add(currentDate,1));$('todayBtn').onclick=()=>load(fmt(new Date()));
  $('calendarBtn').onclick=e=>toggleCalendar(e);$('calPrev').onclick=()=>moveMonth(-1);$('calNext').onclick=()=>moveMonth(1);
  document.addEventListener('click',()=>$('calendarPop').classList.remove('open'));window.addEventListener('online',flushQueue);renderSources();
+ const notice=$('languageNotice');if(notice&&$('todayView'))$('todayView').appendChild(notice);
 }
 function setupPWA(){if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;$('installBtn').classList.remove('hidden')});$('installBtn').onclick=async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('installBtn').classList.add('hidden')}}
 async function setupSupabase(){
@@ -35,9 +37,8 @@ async function setupSupabase(){
  supabase=createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
  const r=await supabase.auth.getSession();session=r.data.session;
  supabase.auth.onAuthStateChange((_e,s)=>{session=s;if(session){$('loginOverlay').classList.add('hidden');subscribe();flushQueue();load(currentDate)}});
- $('loginBtn').onclick=sendMagic;if(!session&&CFG.REQUIRE_LOGIN!==false)$('loginOverlay').classList.remove('hidden');badge();if(session)subscribe();
+ if(!session&&CFG.REQUIRE_LOGIN!==false)$('loginOverlay').classList.remove('hidden');badge();if(session)subscribe();
 }
-async function sendMagic(){const email=$('emailInput').value.trim();if(!email){$('loginMsg').textContent='请先输入邮箱。';return}$('loginMsg').textContent='正在发送…';const redirectTo=location.origin+location.pathname;const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:redirectTo}});$('loginMsg').textContent=error?`发送失败：${error.message}`:'登录链接已发送，请在邮箱中点击。'}
 async function load(d){currentDate=d;$('dateText').textContent=showDate(d);const t=fmt(new Date());$('dateNote').textContent=d===t?'今天':d<t?'过去':'未来';calendarCursor=parse(d);cards=await fetchCards(d);completion=await fetchCompletion(d);renderProgress();renderCards()}
 async function fetchCards(d){if(supabase&&session){const {data,error}=await supabase.from('daily_cards').select('*').eq('study_date',d).order('module');if(!error)return data||[]}return []}
 async function fetchCompletion(d){if(supabase&&session){const {data,error}=await supabase.from('completion').select('module,completed').eq('study_date',d).eq('user_id',session.user.id);if(!error){const o={};(data||[]).forEach(r=>o[r.module]=r.completed);localWrite(d,o);return o}}return localRead(d)}
@@ -55,5 +56,11 @@ function renderCalendar(){const y=calendarCursor.getFullYear(),m=calendarCursor.
 function switchView(v){['today','stats','sources'].forEach(x=>$(x+'View').classList.toggle('hidden',x!==v));document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.view===v));if(v==='stats')renderStats()}
 async function getRange(start,end){if(supabase&&session){const {data,error}=await supabase.from('completion').select('study_date,module,completed').eq('user_id',session.user.id).gte('study_date',start).lte('study_date',end);if(!error)return data||[]}return[]}
 async function renderStats(){const today=fmt(new Date()),ws=weekStart(today),we=add(ws,6),start=add(today,-60),rows=await getRange(start,today),truth=rows.filter(r=>r.completed&&MODULES.some(m=>m.id===r.module)),by={};truth.forEach(r=>(by[r.study_date]??=[]).push(r.module));let streak=0,c=today;while((by[c]||[]).length){streak++;c=add(c,-1)}const week=truth.filter(r=>r.study_date>=ws&&r.study_date<=we),rate=Math.round(week.length/(MODULES.length*7)*100);$('streakNum').textContent=streak;$('totalNum').textContent=truth.length;$('weekRate').textContent=rate+'%';$('statsDateRange').textContent=`${ws} — ${we}`;$('donut').style.setProperty('--pct',rate);$('donutText').textContent=rate+'%';$('weekDescription').textContent=`${MODULES.length} 个栏目 × 7 天。完成一点，也会留下痕迹。`;const dates=Array.from({length:7},(_,i)=>add(ws,i)),cols=`100px repeat(7,1fr) 54px`;$('dayHead').style.gridTemplateColumns=cols;$('dayHead').innerHTML='<span></span>'+['一','二','三','四','五','六','日'].map(x=>`<span>${x}</span>`).join('')+'<span></span>';$('moduleRows').innerHTML=MODULES.map(m=>{const dots=dates.map(d=>`<span class="day-dot ${(by[d]||[]).includes(m.id)?'done':''}"></span>`).join(''),n=dates.filter(d=>(by[d]||[]).includes(m.id)).length;return `<div class="module-row ${m.id}" style="grid-template-columns:${cols}"><span class="module-name">${m.label}</span>${dots}<span class="module-rate">${Math.round(n/7*100)}%</span></div>`}).join('');const hdates=Array.from({length:14},(_,i)=>add(today,-13+i));$('heatmap').innerHTML=hdates.map(d=>{const n=(by[d]||[]).length,l=n===0?0:n===1?1:n===2?2:n<MODULES.length?3:4;return `<div class="heat" data-level="${l}" title="${d}: ${n}/${MODULES.length}">${parse(d).getDate()}</div>`}).join('')}
-function renderSources(){const pools=[['🇬🇧 Daily English',[['China Daily 英语点津','中英双语','https://language.chinadaily.com.cn/news_bilingual'],['News in Levels','分级简单英文','https://www.newsinlevels.com/'],['VOA Learning English','学习者英语','https://learningenglish.voanews.com/']]],['⚛️ 每日物理',[['中科院物理所·物理学咬文嚼字','中文高质量长期题库','https://www.iop.cas.cn/kxcb/kpwz/ywjzzl/'],['Physics World','高质量英文，入选后转中文','https://physicsworld.com/']]],['🧠 每日心理',[['中国科学院心理研究所','中文研究进展与科普','https://www.psych.cas.cn/'],['Greater Good','英文心理学，入选后转中文','https://greatergood.berkeley.edu/']]],['🔭 每日科普',[['中国科普博览','中文科学内容','https://www.kepu.net.cn/'],['Science News Explores','青少年英文科普','https://www.snexplores.org/']]]];$('sourceCards').innerHTML=pools.map(([t,items])=>`<section class="source-card"><h3>${t}</h3>${items.map(([n,d,u])=>`<div class="source-item"><a href="${u}" target="_blank" rel="noopener">${n} ↗</a><p>${d}</p></div>`).join('')}</section>`).join('')}
+function renderSources(){const pools=[
+['🇬🇧 Daily English',[['China Daily 英语点津','中英双语','https://language.chinadaily.com.cn/news_bilingual'],['News in Levels','分级简单英文','https://www.newsinlevels.com/'],['VOA Learning English','学习者英语','https://learningenglish.voanews.com/']]],
+['⚛️ 每日物理',[['中科院物理所·物理学咬文嚼字','中文高质量长期题库','https://www.iop.cas.cn/kxcb/kpwz/ywjzzl/'],['Physics World','高质量英文，入选后转中文','https://physicsworld.com/']]],
+['🧠 每日心理',[['中国科学院心理研究所','中文研究进展与科普','https://www.psych.cas.cn/'],['Greater Good','英文心理学，入选后转中文','https://greatergood.berkeley.edu/']]],
+['🔭 每日科普',[['中国科普博览','中文科学内容','https://www.kepu.net.cn/'],['Science News Explores','青少年英文科普','https://www.snexplores.org/']]],
+['📜 每日诗词',[['经典文学选库','古诗、古词、古文名篇与适合展示的现代诗；优先经典，不走小学启蒙路线','']]]
+];$('sourceCards').innerHTML=pools.map(([t,items])=>`<section class="source-card"><h3>${t}</h3>${items.map(([n,d,u])=>`<div class="source-item">${u?`<a href="${u}" target="_blank" rel="noopener">${n} ↗</a>`:`<strong>${n}</strong>`}<p>${d}</p></div>`).join('')}</section>`).join('')}
 init().catch(err=>{console.error(err);$('cards').innerHTML=`<div class="empty">加载失败：${esc(err.message||String(err))}</div>`});
