@@ -25,7 +25,7 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp index.html styles.css app.js auth-password.js config.js manifest.webmanifest sw.js 404.html .nojekyll _site/
+          cp index.html styles.css poetry.css app.js auth-password.js config.js manifest.webmanifest sw.js 404.html .nojekyll _site/
           cp -r icons data _site/
       - name: Setup Pages
         uses: actions/configure-pages@v5
