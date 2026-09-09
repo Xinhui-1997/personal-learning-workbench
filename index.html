@@ -155,28 +155,6 @@
 <script src="./config.js"></script>
 <script type="module" src="./app.js"></script>
 <script type="module" src="./auth-password.js"></script>
-<script>
-(() => {
-  const moduleClasses = ['task','english','physics','psych','science','poetry'];
-  const backToTop = document.getElementById('backToTop');
-
-  document.getElementById('segments').addEventListener('click', event => {
-    const segment = event.target.closest('.segment');
-    if (!segment) return;
-    const module = moduleClasses.find(name => segment.classList.contains(name));
-    if (!module) return;
-    const target = document.querySelector(`.card.${module}-c`);
-    if (target) target.scrollIntoView({behavior:'smooth', block:'start'});
-  });
-
-  window.addEventListener('scroll', () => {
-    backToTop.classList.toggle('show', window.scrollY > 420);
-  }, {passive:true});
-
-  backToTop.addEventListener('click', () => {
-    window.scrollTo({top:0, behavior:'smooth'});
-  });
-})();
-</script>
+<script type="module" src="./ui-enhancements.js"></script>
 </body>
 </html>
