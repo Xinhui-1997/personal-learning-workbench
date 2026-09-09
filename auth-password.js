@@ -105,3 +105,85 @@ if (CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY) {
   authClient.auth.onAuthStateChange(() => refreshAccountUI());
   await refreshAccountUI();
 }
+
+// Mobile/PWA navigation helpers. Kept in a script that is always loaded by index.html.
+(() => {
+  const moduleNames = ['task','english','physics','psych','science','poetry'];
+
+  let backToTop = document.getElementById('backToTop');
+  if (!backToTop) {
+    backToTop = document.createElement('button');
+    backToTop.id = 'backToTop';
+    backToTop.className = 'back-to-top';
+    backToTop.type = 'button';
+    backToTop.setAttribute('aria-label', '回到顶部');
+    backToTop.setAttribute('title', '回到顶部');
+    backToTop.textContent = '↑';
+    document.body.appendChild(backToTop);
+  }
+
+  // Inline fallback styles make the control visible even if an older CSS file is cached on iOS.
+  Object.assign(backToTop.style, {
+    position: 'fixed',
+    right: '16px',
+    bottom: 'calc(18px + env(safe-area-inset-bottom, 0px))',
+    width: '48px',
+    height: '48px',
+    borderRadius: '16px',
+    border: '1px solid #dfe4ed',
+    background: 'rgba(255,255,255,.97)',
+    boxShadow: '0 10px 28px rgba(29,40,62,.18)',
+    zIndex: '9999',
+    fontSize: '23px',
+    fontWeight: '800',
+    color: '#202733',
+    WebkitTapHighlightColor: 'transparent',
+    transition: 'opacity .18s ease, transform .18s ease'
+  });
+
+  const pageScrollY = () => Math.max(
+    window.scrollY || 0,
+    document.documentElement?.scrollTop || 0,
+    document.body?.scrollTop || 0
+  );
+
+  const updateBackToTop = () => {
+    const visible = pageScrollY() > 260;
+    backToTop.style.opacity = visible ? '1' : '0';
+    backToTop.style.transform = visible ? 'translateY(0)' : 'translateY(8px)';
+    backToTop.style.pointerEvents = visible ? 'auto' : 'none';
+  };
+
+  backToTop.addEventListener('click', () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    document.documentElement.scrollTo?.({ top: 0, behavior: 'smooth' });
+    document.body.scrollTo?.({ top: 0, behavior: 'smooth' });
+  });
+
+  window.addEventListener('scroll', updateBackToTop, { passive: true });
+  document.addEventListener('scroll', updateBackToTop, { passive: true, capture: true });
+  window.visualViewport?.addEventListener('scroll', updateBackToTop, { passive: true });
+  window.addEventListener('pageshow', updateBackToTop);
+  setTimeout(updateBackToTop, 0);
+  setTimeout(updateBackToTop, 500);
+
+  const jumpToModule = module => {
+    const target = document.querySelector(`.card.${module}-c`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // Event delegation survives date changes because the progress bar is re-rendered.
+  document.getElementById('segments')?.addEventListener('click', event => {
+    const segment = event.target.closest('.segment');
+    if (!segment) return;
+    const module = moduleNames.find(name => segment.classList.contains(name));
+    if (module) jumpToModule(module);
+  });
+
+  document.getElementById('segmentLabels')?.addEventListener('click', event => {
+    const labels = [...document.querySelectorAll('#segmentLabels span')];
+    const index = labels.indexOf(event.target.closest('span'));
+    if (index >= 0 && moduleNames[index]) jumpToModule(moduleNames[index]);
+  });
+})();
