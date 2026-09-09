@@ -36,6 +36,8 @@
 - 阅读规则放在哪里
 - 新增静态区域
 
+当前阅读规则放在每日卡片最下方。
+
 ### `styles.css`
 主要界面样式。
 
@@ -45,9 +47,20 @@
 - 间距
 - 手机端布局
 - 按钮和统计页
+- 模块彩色信息框
+- 右下角“回到顶部”悬浮按钮
+
+当前 `.callout`、`.vocab`、`.box`、`.poetry-note` 会自动使用所属模块的柔和主题色。
 
 ### `poetry.css`
 每日诗词的独立颜色和样式。
+
+当前诗词逐句译文使用：
+- `.translation-block`
+- `.translation-title`
+- `.translation-line`
+
+桌面端原句/译文左右对照，手机端自动变成上下对照。
 
 ### `app.js`
 网站核心逻辑。
@@ -68,6 +81,18 @@
 3. 每日生成任务的模块规则
 4. 对应 CSS
 
+### `ui-enhancements.js`
+纯界面增强逻辑，不处理数据。
+
+当前负责：
+- 顶部进度条点击后平滑跳转到对应模块
+- 顶部模块文字也可以点击跳转
+- 键盘 Enter / Space 可触发跳转
+- 右下角悬浮“↑”回到顶部按钮
+- 日期切换导致卡片/进度条重新渲染后，自动重新绑定导航
+
+如果以后只想改这些交互，优先改这个文件，不要塞回 `app.js`。
+
 ### `auth-password.js`
 邮箱 + 密码登录、设置密码、退出登录。
 
@@ -79,7 +104,11 @@
 ### `sw.js`
 PWA 离线缓存。
 
-只要增加了一个新的前端文件，例如 `new-module.css`，通常要把它加进 `APP_SHELL`，并把 CACHE 版本从 `v2` 改成 `v3`，否则手机可能长期看到旧页面。
+只要增加了一个新的前端文件，例如 `new-module.css` / `ui-enhancements.js`，通常要：
+1. 把它加入 `APP_SHELL`
+2. 把 CACHE 版本加一
+
+否则手机可能长期看到旧页面。
 
 ### `manifest.webmanifest`
 控制“添加到主屏幕”后的 App 名称、图标等。
@@ -146,7 +175,29 @@ GitHub Pages 自动部署。
 - Score = 0.30 Quality + 0.20 Interesting + 0.20 Learnability + 0.15 Language fit + 0.10 Novelty + 0.05 Diversity
 - 来源质量低于 80 淘汰
 - 最近内容避免重复
+- 每个模块尽量至少包含一个 `.callout` / `.vocab` 等彩色信息框，使每天视觉层次稳定
 - 每日诗词不要求网站更新，优先从经典文学库选择
+
+### 每日诗词的固定结构
+
+古典作品现在要求：
+1. 原文 / 完整经典选段：`.poetry-text`
+2. 必要注释
+3. **逐句译文**：不能只写一段大意
+4. 一点欣赏：`.poetry-note`
+
+逐句翻译标准结构：
+```html
+<div class="translation-block">
+  <div class="translation-title">逐句译文</div>
+  <div class="translation-line">
+    <strong>原句</strong>
+    <span>这一句对应的现代汉语翻译</span>
+  </div>
+</div>
+```
+
+每个主要诗句/词句都应一一对应，不要漏句。诗词因为逐句翻译，阅读时间允许自然延长到 3–5 分钟。
 
 如果日后要改“内容偏好”，优先改定时任务的 prompt，而不是改网页。
 
@@ -159,6 +210,9 @@ GitHub Pages 自动部署。
 
 ### 只改颜色/布局
 改 `styles.css` / `poetry.css`。
+
+### 改进度条跳转或回到顶部
+改 `ui-enhancements.js`。
 
 ### 改阅读规则文字
 改 `index.html` 里的 `languageNotice`。
