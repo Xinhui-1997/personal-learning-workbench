@@ -1,7 +1,10 @@
 :root{--poetry:#c06b7d;--poetry-soft:#fff1f4}
 .segment.done.poetry{background:var(--poetry)}
+.poetry-c{--accent:var(--poetry);--soft:var(--poetry-soft)}
 .poetry-c .kicker{color:#a94f65}
 .poetry-c .box{background:var(--poetry-soft)}
 .module-row.poetry .day-dot.done{background:var(--poetry);border-color:var(--poetry)}
 .poetry-c .box p{margin:.35em 0}
 .poetry-c .lead{font-family:"STKaiti","KaiTi","Songti SC",serif;font-size:17px}
+.poetry-c .translation-line{padding:.45em 0;border-bottom:1px dashed rgba(192,107,125,.18)}
+.poetry-c .translation-line:last-child{border-bottom:0}
