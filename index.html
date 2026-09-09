@@ -55,11 +55,11 @@
       </div>
 
       <div class="segment-wrap">
-        <div id="segments" class="segments"></div>
+        <div id="segments" class="segments" aria-label="模块快捷导航"></div>
         <div id="segmentLabels" class="segment-labels"></div>
         <div class="day-summary">
           <span id="progressText">今日完成 0 / 6</span>
-          <span>每部分约 1–2 分钟</span>
+          <span>点击上方模块可直接跳转</span>
         </div>
       </div>
     </section>
@@ -67,7 +67,7 @@
     <div id="cards" class="grid"></div>
 
     <div id="languageNotice" class="notice">
-      <strong>阅读规则：</strong>Daily English 保持中英双语；物理、心理和科普以中文为主；每日诗词从经典文学选库中推荐古诗、古词、古文名篇或现代诗，并提供注释、译意与简短赏析。高质量英文来源可以进入候选池，但默认先翻译、压缩成中文短卡。
+      <strong>阅读规则：</strong>Daily English 保持中英双语；物理、心理和科普以中文为主；每日诗词从经典文学选库中推荐古诗、古词、古文名篇或现代诗，并提供注释、逐句译文与简短赏析。高质量英文来源可以进入候选池，但默认先翻译、压缩成中文短卡。
     </div>
   </main>
 
@@ -126,6 +126,8 @@
     <span id="modeText">Demo / 本地缓存</span>
   </footer>
 </div>
+
+<button id="backToTop" class="back-to-top" aria-label="回到顶部" title="回到顶部">↑</button>
 
 <div id="loginOverlay" class="overlay hidden">
   <div class="login-card">
