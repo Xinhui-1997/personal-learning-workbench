@@ -6,5 +6,12 @@
 .module-row.poetry .day-dot.done{background:var(--poetry);border-color:var(--poetry)}
 .poetry-c .box p{margin:.35em 0}
 .poetry-c .lead{font-family:"STKaiti","KaiTi","Songti SC",serif;font-size:17px}
-.poetry-c .translation-line{padding:.45em 0;border-bottom:1px dashed rgba(192,107,125,.18)}
-.poetry-c .translation-line:last-child{border-bottom:0}
+.poetry-c .poetry-text{font-family:"STKaiti","KaiTi","Songti SC",serif;font-size:16.5px;line-height:2;background:linear-gradient(135deg,#fff7f8,#fff1f4);border:1px solid rgba(192,107,125,.16);border-radius:16px;padding:15px 16px;margin:13px 0;box-shadow:inset 3px 0 0 rgba(192,107,125,.5)}
+.poetry-c .translation-block{margin:12px 0;border:1px solid rgba(192,107,125,.16);border-radius:16px;overflow:hidden;background:rgba(255,248,249,.78)}
+.poetry-c .translation-title{padding:10px 14px;background:rgba(192,107,125,.08);font-weight:800;color:#93465a}
+.poetry-c .translation-line{display:grid;grid-template-columns:minmax(135px,.92fr) minmax(0,1.5fr);gap:14px;padding:10px 14px;border-top:1px dashed rgba(192,107,125,.2);align-items:start}
+.poetry-c .translation-line:first-of-type{border-top:0}
+.poetry-c .translation-line strong{font-family:"STKaiti","KaiTi","Songti SC",serif;color:#6f3443;font-weight:750;line-height:1.75}
+.poetry-c .translation-line span{color:#4c5666;line-height:1.75}
+.poetry-c .poetry-note{background:linear-gradient(135deg,#fff5f7,#fffafb)}
+@media(max-width:780px){.poetry-c .translation-line{grid-template-columns:1fr;gap:3px;padding:10px 12px}.poetry-c .poetry-text{font-size:16px;padding:13px 14px}}
