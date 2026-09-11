@@ -9,11 +9,12 @@
 - 前端托管：GitHub Pages
 - 云端数据：Supabase
 - 当前 Supabase 项目：`kemjqowxmyzauvbyebwg`
-- 每日内容：ChatGPT 定时任务每天 05:30（Asia/Tokyo）生成并写入 `daily_cards`
+- 每日内容：ChatGPT 定时任务每天 05:30（Asia/Tokyo）生成并写入 `public.daily_cards`
+- 周六提醒：每周六 08:00 读取当天 `weekend_read` 并发送；原则上不重新选文
 
-## 2. 现在有 6 个模块
+## 2. 当前模块
 
-数据库里的 module 值：
+常规每天 6 个模块：
 
 - `task` → 今日小事
 - `english` → Daily English
@@ -22,120 +23,88 @@
 - `science` → 每日科普
 - `poetry` → 每日诗词
 
-每日诗词内容池在：`data/poetry_catalog.json`
+星期六额外出现第 7 个模块：
 
-## 3. 文件各自负责什么
+- `weekend_read` → 周六短读
+
+`weekend_read` 只在星期六计入当天进度和统计，其他日期不应显示，也不应进入完成率分母。
+
+每日诗词内容池在：`data/poetry_catalog.json`。
+
+## 3. 正式数据流
+
+这个项目不是“每天重新生成 HTML”。正式流程是：
+
+1. GitHub Pages 部署固定前端：`index.html` + CSS + JS。
+2. 每天 05:30 的 ChatGPT 定时任务生成当天内容并写入 Supabase `daily_cards`。
+3. 前端打开某个日期时，从 Supabase 查询该日期的卡片。
+4. 常规日期显示 6 个模块；星期六前端额外允许并显示 `weekend_read`。
+5. 用户完成状态写入 `completion`，电脑和手机通过 Supabase Auth + Realtime 同步。
+6. 每周六 08:00 的提醒任务读取当天已经生成的 `weekend_read`，因此聊天和网页看到的是同一篇文章。
+
+不要再建立另一套独立 JSON/HTML 周六选文流程，否则容易出现两个来源不一致。
+
+## 4. 文件各自负责什么
 
 ### `index.html`
-页面骨架。
-
-适合修改：
-- 顶部导航
-- 日期区域
-- 登录/账号弹窗
-- 阅读规则放在哪里
-- 新增静态区域
-
-当前阅读规则放在每日卡片最下方。
+页面骨架、阅读规则、CSS/JS 引用。
 
 ### `styles.css`
-主要界面样式。
-
-适合修改：
-- 卡片大小
-- 字体
-- 间距
-- 手机端布局
-- 按钮和统计页
-- 模块彩色信息框
-- 右下角“回到顶部”悬浮按钮
-
-当前 `.callout`、`.vocab`、`.box`、`.poetry-note` 会自动使用所属模块的柔和主题色。
+主要界面样式：布局、普通模块卡片、统计页、按钮、回到顶部等。
 
 ### `poetry.css`
-每日诗词的独立颜色和样式。
+每日诗词专用样式，包括 `.translation-block` / `.translation-line` 等逐句译文结构。
 
-当前诗词逐句译文使用：
-- `.translation-block`
-- `.translation-title`
-- `.translation-line`
-
-桌面端原句/译文左右对照，手机端自动变成上下对照。
+### `weekend-read.css`
+周六短读专用样式。当前使用独立柔和主题色，并让周六短读在桌面端横跨整行。
 
 ### `app.js`
-网站核心逻辑。
+网站核心逻辑：
 
-这里控制：
 - 模块列表 `BASE`
+- `modulesForDate(date)`：决定某天应该有哪些模块
 - 日期切换
-- 从 Supabase 读每天的卡片
-- 完成/取消完成
+- 从 Supabase 读取 `daily_cards`
+- 完成状态
 - 进度条
 - 统计页
 - 来源页
 - Realtime 同步
 
-如果要新增模块，通常至少要同时修改：
-1. `app.js` 的模块列表
-2. Supabase 两张表的 module CHECK constraint
-3. 每日生成任务的模块规则
-4. 对应 CSS
+周六限定逻辑的关键点：`weekend_read` 存在于模块全集，但只有 `parse(date).getDay()===6` 时才进入当天模块列表。
+
+统计页也必须按“实际应有模块数”计算：普通日 6 项，周六 7 项（若以后关闭 `task`，还要继续按配置动态计算）。
 
 ### `ui-enhancements.js`
-纯界面增强逻辑，不处理数据。
-
-当前负责：
-- 顶部进度条点击后平滑跳转到对应模块
-- 顶部模块文字也可以点击跳转
-- 键盘 Enter / Space 可触发跳转
-- 右下角悬浮“↑”回到顶部按钮
-- 日期切换导致卡片/进度条重新渲染后，自动重新绑定导航
-
-如果以后只想改这些交互，优先改这个文件，不要塞回 `app.js`。
+界面增强：顶部进度条/文字点击跳转、键盘跳转、右下角回到顶部。模块列表中也要包含 `weekend_read`。
 
 ### `auth-password.js`
 邮箱 + 密码登录、设置密码、退出登录。
 
 ### `config.js`
-前端连接 Supabase 的公开配置。
-
-注意：这里只能放浏览器端可公开的 publishable/anon key，绝不能放 service role secret。
+浏览器端 Supabase 公开配置。绝不能写 service role secret。
 
 ### `sw.js`
-PWA 离线缓存。
+PWA 离线缓存。新增前端文件后必须：
 
-只要增加了一个新的前端文件，例如 `new-module.css` / `ui-enhancements.js`，通常要：
-1. 把它加入 `APP_SHELL`
-2. 把 CACHE 版本加一
+1. 加入 `APP_SHELL`
+2. 升级 `CACHE` 版本
 
-否则手机可能长期看到旧页面。
-
-### `manifest.webmanifest`
-控制“添加到主屏幕”后的 App 名称、图标等。
+当前周六短读上线时已把 `weekend-read.css` 加入缓存。
 
 ### `.github/workflows/deploy-pages.yml`
-GitHub Pages 自动部署。
+GitHub Pages 自动部署。每次 `main` 有提交会把前端文件复制到 `_site` 后发布。
 
-每次 main 分支有新提交，GitHub Actions 会把列出的前端文件复制到 `_site` 并发布。
-
-重要：新建前端文件后，除了在 HTML 中引用，还必须确认这里的 `cp ... _site/` 也包含它，否则仓库里有文件但线上网站没有。
+新增前端文件时，不仅要在 HTML 引用，还要把文件加入这里的 `cp ... _site/`。
 
 ### `data/poetry_catalog.json`
-每日诗词候选库与选材规则。
+每日诗词候选库。
 
-可以直接继续添加：
-```json
-{"author":"作者","title":"作品名","type":"古词","priority":9}
-```
-
-现代诗要注意版权；仍受版权保护的作品不应把全文直接放进网站。
-
-## 4. Supabase 数据结构
+## 5. Supabase 数据结构
 
 ### `daily_cards`
-每天的学习内容。
-
 主要字段：
+
 - `study_date`
 - `module`
 - `title`
@@ -145,132 +114,135 @@ GitHub Pages 自动部署。
 - `source_url`
 - `score`
 
-唯一键：`(study_date, module)`
+唯一键：`(study_date, module)`。
 
-所以一天同一个模块只保留一张卡。
+`module` CHECK 当前允许：`task, english, physics, psych, science, poetry, weekend_read`。
 
 ### `completion`
-用户完成状态。
-
 主要字段：
+
 - `user_id`
 - `study_date`
 - `module`
 - `completed`
 - `updated_at`
 
-唯一键：`(user_id, study_date, module)`
+唯一键：`(user_id, study_date, module)`。
 
-手机和电脑同步就是靠这张表 + Supabase Auth + Realtime。
+`module` CHECK 同样允许 `weekend_read`。
 
-## 5. 每日内容生成规则
+## 6. 每日内容生成规则
 
-当前定时任务每天日本时间 05:30 运行。
+每天 05:30 运行。
 
-总体原则：
-- 每天生成 6 个模块
+常规日期生成 6 个模块；如果当天是星期六，再额外生成 `weekend_read`。
+
+通用原则：
+
 - English 中英双语
 - 物理 / 心理 / 科普中文优先
 - 外部来源必须是真实可追溯的标题与 URL
 - Score = 0.30 Quality + 0.20 Interesting + 0.20 Learnability + 0.15 Language fit + 0.10 Novelty + 0.05 Diversity
 - 来源质量低于 80 淘汰
 - 最近内容避免重复
-- 每个模块尽量至少包含一个 `.callout` / `.vocab` 等彩色信息框，使每天视觉层次稳定
-- 每日诗词不要求网站更新，优先从经典文学库选择
+- 卡片尽量使用 `.callout` / `.vocab` 等信息块，避免整页只有普通段落
 
-### 每日诗词的固定结构
+### 每日诗词
 
-古典作品现在要求：
-1. 原文 / 完整经典选段：`.poetry-text`
+古典作品要求：
+
+1. `.poetry-text` 展示全文或完整经典选段
 2. 必要注释
-3. **逐句译文**：不能只写一段大意
-4. 一点欣赏：`.poetry-note`
+3. **逐句译文**，不能只给一段大意
+4. `.poetry-note` 做简短欣赏
 
-逐句翻译标准结构：
+逐句译文结构：
+
 ```html
 <div class="translation-block">
   <div class="translation-title">逐句译文</div>
   <div class="translation-line">
     <strong>原句</strong>
-    <span>这一句对应的现代汉语翻译</span>
+    <span>对应的现代汉语翻译</span>
   </div>
 </div>
 ```
 
-每个主要诗句/词句都应一一对应，不要漏句。诗词因为逐句翻译，阅读时间允许自然延长到 3–5 分钟。
+诗词可自然延长到约 3–5 分钟。现代作品要注意版权，不要复制仍受保护作品的全文。
 
-如果日后要改“内容偏好”，优先改定时任务的 prompt，而不是改网页。
+### 周六短读 `weekend_read`
 
-例如：
-- 想让物理更专业 → 改每日任务的 physics 规则
-- 想让诗词更偏宋词 → 改 poetry 规则 / `poetry_catalog.json`
-- 想完全删除今日小事 → 同时改前端模块、数据库约束、生成任务
+硬性标准：
 
-## 6. 最常见修改怎么做
+- 只在星期六生成
+- 文章必须在生成日前 14 天内发表
+- 免费可读，原文链接可直接打开
+- 类型：人物 / 思想 / 文化文章或随笔
+- 原文优先约 5–10 分钟
+- 查询最近至少 8 周的 `weekend_read`，避免重复作者、刊物、URL 和过于相似的主题
+- 不做阅读理解题，不要求用户记忆或总结
+
+建议 `body_html`：一句中文导读 + `<div class="callout"><strong>为什么值得读：</strong>...</div>` + 2–4 个主题标签。
+
+字段约定：
+
+- `title`：原文准确标题
+- `source_name`：`作者 · 媒体/刊物`
+- `source_url`：原文链接
+- `meta`：发布日期 + 约 5–10 分钟 + 免费可读
+
+## 7. 常见修改
 
 ### 只改颜色/布局
-改 `styles.css` / `poetry.css`。
+改 `styles.css`；诗词改 `poetry.css`；周六短读改 `weekend-read.css`。
 
 ### 改进度条跳转或回到顶部
 改 `ui-enhancements.js`。
 
 ### 改阅读规则文字
-改 `index.html` 里的 `languageNotice`。
-
-### 改栏目名字
-改 `app.js` 的 `BASE`。
+改 `index.html` 的 `languageNotice`。
 
 ### 新增一个栏目
-不要只改页面。需要：
-1. `app.js` 增加模块
-2. CSS 增加颜色
-3. Supabase `daily_cards` 和 `completion` 的 CHECK constraint 增加 module
-4. 每日自动任务增加该模块的内容规则
-5. 如新增独立 CSS/JS，更新 `deploy-pages.yml` 和 `sw.js`
+不要只改页面。至少检查：
 
-### 修改每日诗词候选
-直接改 `data/poetry_catalog.json`。
-
-### 改登录方式
-主要看 `auth-password.js` 和 `index.html` 登录框。
+1. `app.js` 模块列表和日期条件
+2. `ui-enhancements.js` 导航模块
+3. CSS
+4. Supabase `daily_cards` / `completion` 的 module CHECK
+5. 每日自动任务 prompt
+6. `deploy-pages.yml`
+7. `sw.js`
+8. README / MAINTENANCE
 
 ### 页面改了但手机还是旧的
 检查：
+
 1. GitHub Actions 是否部署成功
-2. `deploy-pages.yml` 是否把新文件复制到 `_site`
-3. `sw.js` 的 CACHE 版本是否升级
+2. `deploy-pages.yml` 是否包含新文件
+3. `sw.js` CACHE 是否升级
 4. 手机彻底关闭 PWA 后重开，必要时清站点缓存
 
-## 7. 如何确认某次修改是否上线
+## 8. 如何确认上线
 
-在 GitHub 仓库：
+GitHub：`Actions` → `Deploy PWA to GitHub Pages`，最新一条应为绿色 Success。
 
-`Actions` → `Deploy PWA to GitHub Pages`
-
-最新一条必须是绿色 Success。
-
-然后打开：
-
-`https://xinhui-1997.github.io/personal-learning-workbench/`
+线上：`https://xinhui-1997.github.io/personal-learning-workbench/`
 
 电脑可用 Ctrl+F5 强制刷新。
 
-## 8. 不要把什么提交到 GitHub
+## 9. 安全规则
 
 不要提交：
+
 - Supabase service role key
 - 私人 API secret
 - 邮箱密码
 - 任何真实账户密码
 
-`config.js` 里的 Supabase publishable/anon key 本来就是浏览器端使用，可以公开；真正敏感的服务端密钥不能放进去。
+`config.js` 的 publishable/anon key 可以用于浏览器；真正敏感的服务端密钥不能放进去。
 
-## 9. 如果未来让另一个 ChatGPT 接手
-
-不要重新从头描述整个项目。
+## 10. 以后让另一个 ChatGPT 接手
 
 直接告诉它：
 
-> 请接手我的 GitHub 项目 `Xinhui-1997/personal-learning-workbench`。先阅读 `README.md`、`MAINTENANCE.md`、`FUTURE_CHAT_PROMPT.md`，再检查当前 main 分支代码和 Supabase schema，然后根据我的新要求继续修改。不要凭以前聊天猜测，以仓库和数据库当前状态为准。
-
-这样即使原对话完全丢失，也可以继续。
+> 请接手我的 GitHub 项目 `Xinhui-1997/personal-learning-workbench`。先阅读 `README.md`、`MAINTENANCE.md`、`FUTURE_CHAT_PROMPT.md`，再检查当前 main 分支代码、Supabase schema 和两个内容定时任务，然后根据我的新要求继续修改。不要凭以前聊天猜测，以仓库、数据库和当前任务配置为准。
