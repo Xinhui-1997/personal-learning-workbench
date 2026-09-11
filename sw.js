@@ -1,6 +1,6 @@
-const CACHE = "learning-workbench-v6";
+const CACHE = "learning-workbench-v7";
 const APP_SHELL = [
-  "./", "./index.html", "./styles.css", "./poetry.css", "./app.js", "./auth-password.js", "./ui-enhancements.js", "./config.js",
+  "./", "./index.html", "./styles.css", "./poetry.css", "./weekend-read.css", "./app.js", "./auth-password.js", "./ui-enhancements.js", "./config.js",
   "./manifest.webmanifest", "./data/demo_cards.json",
   "./icons/icon.svg"
 ];
