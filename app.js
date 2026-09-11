@@ -7,6 +7,7 @@ const BASE=[
 {id:'science',label:'每日科普',icon:'🔭',cls:'science-c'},
 {id:'poetry',label:'每日诗词',icon:'📜',cls:'poetry-c'},
 {id:'weekend_read',label:'周六短读',icon:'📖',cls:'weekend-c'}];
+const BONUS={id:'fun',label:'每日开心一刻',icon:'😄',cls:'fun-c'};
 const ALL_MODULES=BASE.filter(m=>CFG.SHOW_DAILY_TASK!==false||m.id!=='task');
 const $=id=>document.getElementById(id);
 let supabase=null,session=null,currentDate=fmt(new Date()),calendarCursor=parse(currentDate),cards=[],completion={},installPrompt=null;
@@ -24,6 +25,23 @@ function localWrite(d,v){localStorage.setItem(lk(d),JSON.stringify(v))}
 function qread(){try{return JSON.parse(localStorage.getItem('plw-sync-queue'))||[]}catch{return[]}}
 function qwrite(v){localStorage.setItem('plw-sync-queue',JSON.stringify(v))}
 function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function displayMeta(raw,fallback='约 1–2 分钟'){
+ if(raw==null||raw==='')return fallback;
+ const fromObject=obj=>{
+  if(!obj||typeof obj!=='object'||Array.isArray(obj))return fallback;
+  const parts=[];
+  const addPart=v=>{if(v!=null&&String(v).trim()&&!parts.includes(String(v).trim()))parts.push(String(v).trim())};
+  addPart(obj.duration);addPart(obj.reading_time);addPart(obj.language);addPart(obj.published_date);addPart(obj.published_at);
+  if(obj.free_read===true)addPart('免费可读');
+  return parts.length?parts.join(' · '):fallback;
+ };
+ if(typeof raw==='object')return fromObject(raw);
+ const text=String(raw).trim();
+ if(!text)return fallback;
+ if(!text.startsWith('{')&&!text.startsWith('['))return text;
+ try{return fromObject(JSON.parse(text))}catch{return fallback}
+}
+function coreDoneCount(){return modulesForDate(currentDate).filter(m=>completion[m.id]).length}
 
 async function init(){setupUI();setupPWA();if(configured)await setupSupabase();await load(currentDate)}
 function setupUI(){
@@ -45,8 +63,14 @@ async function load(d){currentDate=d;$('dateText').textContent=showDate(d);const
 async function fetchCards(d){if(supabase&&session){const {data,error}=await supabase.from('daily_cards').select('*').eq('study_date',d).order('module');if(!error)return data||[]}return []}
 async function fetchCompletion(d){if(supabase&&session){const {data,error}=await supabase.from('completion').select('module,completed').eq('study_date',d).eq('user_id',session.user.id);if(!error){const o={};(data||[]).forEach(r=>o[r.module]=r.completed);localWrite(d,o);return o}}return localRead(d)}
 function renderProgress(){const active=modulesForDate(currentDate),cols=`repeat(${active.length},1fr)`;$('segments').style.gridTemplateColumns=cols;$('segmentLabels').style.gridTemplateColumns=cols;$('segments').innerHTML=active.map(m=>`<div class="segment ${m.id} ${completion[m.id]?'done':''}"></div>`).join('');$('segmentLabels').innerHTML=active.map(m=>`<span>${m.label}</span>`).join('');$('progressText').textContent=`今日完成 ${active.filter(m=>completion[m.id]).length} / ${active.length}`}
-function renderCards(){if(!cards.length){$('cards').innerHTML=`<div class="empty"><div class="emoji">🗓️</div><strong>${showDate(currentDate)}</strong><br>这一天还没有内容。</div>`;return}const active=modulesForDate(currentDate),by=Object.fromEntries(cards.map(c=>[c.module,c]));$('cards').innerHTML=active.filter(m=>by[m.id]).map(m=>card(m,by[m.id])).join('');document.querySelectorAll('[data-complete]').forEach(b=>b.onclick=()=>toggleComplete(b.dataset.complete))}
-function card(m,d){const title=d.source_url?`<a class="original-link" href="${esc(d.source_url)}" target="_blank" rel="noopener">${esc(d.title)}<span class="external"> ↗ 原文</span></a>`:esc(d.title);const score=d.score==null?'':`<div class="score">Score ${Math.round(d.score)}</div>`;return `<section class="card ${m.cls}"><div class="card-head"><div><div class="kicker">${m.icon} ${m.label}</div><h2>${title}</h2><div class="meta">${esc(d.meta||'约 1–2 分钟')}</div></div>${score}</div>${d.body_html||''}<div class="source-row"><div class="source-info">${esc(d.source_name||'')}</div><button class="complete-btn ${completion[m.id]?'done':''}" data-complete="${m.id}">${completion[m.id]?'✓ 已完成':'标记完成'}</button></div></section>`}
+function renderCards(){if(!cards.length){$('cards').innerHTML=`<div class="empty"><div class="emoji">🗓️</div><strong>${showDate(currentDate)}</strong><br>这一天还没有内容。</div>`;return}const active=modulesForDate(currentDate),by=Object.fromEntries(cards.map(c=>[c.module,c]));const regular=active.filter(m=>by[m.id]).map(m=>card(m,by[m.id])).join('');const bonus=by[BONUS.id]?funCard(by[BONUS.id]):'';$('cards').innerHTML=regular+bonus;document.querySelectorAll('[data-complete]').forEach(b=>b.onclick=()=>toggleComplete(b.dataset.complete))}
+function card(m,d){const title=d.source_url?`<a class="original-link" href="${esc(d.source_url)}" target="_blank" rel="noopener">${esc(d.title)}<span class="external"> ↗ 原文</span></a>`:esc(d.title);const score=d.score==null?'':`<div class="score">Score ${Math.round(d.score)}</div>`;const fallback=m.id==='task'?'30–60 秒':m.id==='poetry'?'约 3–5 分钟':'约 1–2 分钟';return `<section class="card ${m.cls}"><div class="card-head"><div><div class="kicker">${m.icon} ${m.label}</div><h2>${title}</h2><div class="meta">${esc(displayMeta(d.meta,fallback))}</div></div>${score}</div>${d.body_html||''}<div class="source-row"><div class="source-info">${esc(d.source_name||'')}</div><button class="complete-btn ${completion[m.id]?'done':''}" data-complete="${m.id}">${completion[m.id]?'✓ 已完成':'标记完成'}</button></div></section>`}
+function funCard(d){
+ const done=coreDoneCount(),unlocked=done>=3,remaining=Math.max(0,3-done);
+ if(!unlocked)return `<section class="card ${BONUS.cls} reward-locked"><div class="card-head"><div><div class="kicker">${BONUS.icon} ${BONUS.label}</div><h2>今日彩蛋待解锁</h2><div class="meta">奖励模块 · 不计入今日进度</div></div><div class="reward-badge">🔒</div></div><div class="locked-reward"><div class="lock-icon">🎁</div><strong>再完成 ${remaining} 个模块就能打开</strong><p>完成任意 3 个学习模块后，今天的开心一刻会自动出现。</p><div class="reward-progress">${Array.from({length:3},(_,i)=>`<span class="${i<Math.min(done,3)?'filled':''}"></span>`).join('')}</div></div></section>`;
+ const title=d.source_url?`<a class="original-link" href="${esc(d.source_url)}" target="_blank" rel="noopener">${esc(d.title)}<span class="external"> ↗ 来源</span></a>`:esc(d.title);
+ return `<section class="card ${BONUS.cls}"><div class="card-head"><div><div class="kicker">${BONUS.icon} ${BONUS.label}</div><h2>${title}</h2><div class="meta">${esc(displayMeta(d.meta,'约 10–30 秒'))} · 已解锁 🎉</div></div></div>${d.body_html||''}<div class="source-row"><div class="source-info">${esc(d.source_name||'')}</div><span class="reward-note">今天的奖励，不增加任务数</span></div></section>`;
+}
 async function toggleComplete(module){const next=!completion[module];completion[module]=next;localWrite(currentDate,completion);renderProgress();renderCards();if(!(supabase&&session))return;setBadge('syncing');const payload={user_id:session.user.id,study_date:currentDate,module,completed:next,updated_at:new Date().toISOString()};const {error}=await supabase.from('completion').upsert(payload,{onConflict:'user_id,study_date,module'});if(error){const q=qread();q.push(payload);qwrite(q);setBadge('offline')}else setBadge('synced')}
 async function flushQueue(){if(!(supabase&&session))return;const q=qread();if(!q.length){setBadge('synced');return}setBadge('syncing');const remain=[];for(const x of q){const {error}=await supabase.from('completion').upsert({...x,user_id:session.user.id},{onConflict:'user_id,study_date,module'});if(error)remain.push(x)}qwrite(remain);setBadge(remain.length?'offline':'synced')}
 function setBadge(mode){const e=$('syncBadge');e.className=`sync-badge ${mode}`;e.textContent=mode==='synced'?'已同步':mode==='syncing'?'同步中':'离线待同步';$('modeText').textContent=session?'云端同步已启用':'等待登录'}
@@ -63,10 +87,10 @@ async function renderStats(){
  let streak=0,c=today;while((by[c]||[]).length){streak++;c=add(c,-1)}
  const dates=Array.from({length:7},(_,i)=>add(ws,i)),week=truth.filter(r=>r.study_date>=ws&&r.study_date<=we),slots=dates.reduce((n,d)=>n+modulesForDate(d).length,0),rate=slots?Math.round(week.length/slots*100):0;
  $('streakNum').textContent=streak;$('totalNum').textContent=truth.length;$('weekRate').textContent=rate+'%';$('statsDateRange').textContent=`${ws} — ${we}`;$('donut').style.setProperty('--pct',rate);$('donutText').textContent=rate+'%';
- const regular=modulesForDate(ws).length;$('weekDescription').textContent=`平日 ${regular} 个栏目，周六加一篇「周六短读」。完成一点，也会留下痕迹。`;
+ const regular=modulesForDate(ws).length;$('weekDescription').textContent=`平日 ${regular} 个学习栏目，周六加一篇「周六短读」；「每日开心一刻」是完成 3 个模块后的奖励，不计入进度。`;
  const cols=`100px repeat(7,1fr) 54px`;$('dayHead').style.gridTemplateColumns=cols;$('dayHead').innerHTML='<span></span>'+['一','二','三','四','五','六','日'].map(x=>`<span>${x}</span>`).join('')+'<span></span>';
  $('moduleRows').innerHTML=ALL_MODULES.map(m=>{const activeDates=dates.filter(d=>modulesForDate(d).some(x=>x.id===m.id)),dots=dates.map(d=>{const active=modulesForDate(d).some(x=>x.id===m.id);return `<span class="day-dot ${active?'':'inactive'} ${active&&(by[d]||[]).includes(m.id)?'done':''}"></span>`}).join(''),n=activeDates.filter(d=>(by[d]||[]).includes(m.id)).length,den=activeDates.length;return `<div class="module-row ${m.id}" style="grid-template-columns:${cols}"><span class="module-name">${m.label}</span>${dots}<span class="module-rate">${den?Math.round(n/den*100):0}%</span></div>`}).join('');
- const hdates=Array.from({length:14},(_,i)=>add(today,-13+i));$('heatmap').innerHTML=hdates.map(d=>{const expected=modulesForDate(d).length,n=(by[d]||[]).length,r=expected?n/expected:0,l=n===0?0:r<=.34?1:r<=.67?2:r<1?3:4;return `<div class="heat" data-level="${l}" title="${d}: ${n}/${expected}">${parse(d).getDate()}</div>`}).join('')
+ const hdates=Array.from({length:14},(_,i)=>add(today,-13+i));$('heatmap').innerHTML=hdates.map(d=>{const expected=modulesForDate(d).length,n=(by[d]||[]).length,r=expected?n/expected:0,l=n===0?0:r<=.34?1:r<=.67?2:r<1?3:4;return `<div class="heat" data-level="${l}" title="${d}: ${n}/${expected}">${parse(d).getDate()}</div>`).join('')
 }
 function renderSources(){const pools=[
 ['🇬🇧 Daily English',[['China Daily 英语点津','中英双语','https://language.chinadaily.com.cn/news_bilingual'],['News in Levels','分级简单英文','https://www.newsinlevels.com/'],['VOA Learning English','学习者英语','https://learningenglish.voanews.com/']]],
@@ -74,6 +98,7 @@ function renderSources(){const pools=[
 ['🧠 每日心理',[['中国科学院心理研究所','中文研究进展与科普','https://www.psych.cas.cn/'],['Greater Good','英文心理学，入选后转中文','https://greatergood.berkeley.edu/']]],
 ['🔭 每日科普',[['中国科普博览','中文科学内容','https://www.kepu.net.cn/'],['Science News Explores','青少年英文科普','https://www.snexplores.org/']]],
 ['📜 每日诗词',[['经典文学选库','古诗、古词、古文名篇与适合展示的现代诗；优先经典，不走小学启蒙路线','']]],
-['📖 周六短读',[['近两周人物 / 思想 / 文化文章','只在周六出现；免费可读，优先 5–10 分钟，先核实发布日期与原文链接','']]]
+['📖 周六短读',[['近两周人物 / 思想 / 文化文章','只在周六出现；免费可读，优先 5–10 分钟，先核实发布日期与原文链接','']]],
+['😄 每日开心一刻',[['轻松奖励内容','冷笑话、热笑话、谐音梗或有趣小事；干净、不低俗，完成 3 个学习模块后解锁','']]]
 ];$('sourceCards').innerHTML=pools.map(([t,items])=>`<section class="source-card"><h3>${t}</h3>${items.map(([n,d,u])=>`<div class="source-item">${u?`<a href="${u}" target="_blank" rel="noopener">${n} ↗</a>`:`<strong>${n}</strong>`}<p>${d}</p></div>`).join('')}</section>`).join('')}
 init().catch(err=>{console.error(err);$('cards').innerHTML=`<div class="empty">加载失败：${esc(err.message||String(err))}</div>`});
