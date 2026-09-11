@@ -1,0 +1,14 @@
+:root{
+  --weekend:#c86f8d;
+  --weekend-soft:#fff2f6;
+}
+.segment.done.weekend_read{background:var(--weekend)}
+.weekend-c{
+  --accent:var(--weekend);
+  --soft:var(--weekend-soft);
+  grid-column:1/-1;
+}
+.weekend-c .kicker{color:#ad4f6e}
+.weekend-c .box{background:var(--weekend-soft)}
+.module-row.weekend_read .day-dot.done{background:var(--weekend);border-color:var(--weekend)}
+.day-dot.inactive{background:transparent;border-color:transparent;box-shadow:none}
