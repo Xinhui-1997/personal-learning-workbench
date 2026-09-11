@@ -70,9 +70,21 @@ function addBackToTop(){
   update();
 }
 
+function keepCalendarOpenWhilePaging(){
+  const pop=document.getElementById('calendarPop');
+  if(!pop||pop.dataset.keepOpenBound==='1')return;
+  pop.dataset.keepOpenBound='1';
+  // The core app closes the calendar on any document click. Stop clicks inside
+  // the calendar from bubbling to that handler so month arrows can be pressed
+  // repeatedly. Selecting a day still closes it because the day button's own
+  // handler explicitly closes the popover.
+  pop.addEventListener('click',event=>event.stopPropagation());
+}
+
 function enhance(){
   wireProgressNavigation();
   addBackToTop();
+  keepCalendarOpenWhilePaging();
 }
 
 const observer=new MutationObserver(mutations=>{
