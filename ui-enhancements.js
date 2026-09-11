@@ -4,11 +4,19 @@ const NAV_MODULES=[
   {id:'physics',label:'每日物理',cls:'physics-c'},
   {id:'psych',label:'每日心理',cls:'psych-c'},
   {id:'science',label:'每日科普',cls:'science-c'},
-  {id:'poetry',label:'每日诗词',cls:'poetry-c'}
+  {id:'poetry',label:'每日诗词',cls:'poetry-c'},
+  {id:'weekend_read',label:'周六短读',cls:'weekend-c'}
 ];
 
+function activeNavModules(){
+  return Array.from(document.querySelectorAll('#segmentLabels > *')).map(el=>{
+    const label=el.textContent.trim();
+    return NAV_MODULES.find(m=>m.label===label);
+  }).filter(Boolean);
+}
+
 function jumpToModule(index){
-  const mod=NAV_MODULES[index];
+  const mod=activeNavModules()[index];
   if(!mod)return;
   const target=document.querySelector(`.card.${mod.cls}`);
   if(!target)return;
@@ -21,8 +29,9 @@ function jumpToModule(index){
 }
 
 function wireProgressNavigation(){
+  const active=activeNavModules();
   document.querySelectorAll('#segments .segment').forEach((el,index)=>{
-    const mod=NAV_MODULES[index];
+    const mod=active[index];
     if(!mod)return;
     el.setAttribute('role','button');
     el.setAttribute('tabindex','0');
@@ -33,7 +42,7 @@ function wireProgressNavigation(){
   });
 
   document.querySelectorAll('#segmentLabels > *').forEach((el,index)=>{
-    const mod=NAV_MODULES[index];
+    const mod=active[index];
     if(!mod)return;
     el.classList.add('segment-label');
     el.setAttribute('role','button');
