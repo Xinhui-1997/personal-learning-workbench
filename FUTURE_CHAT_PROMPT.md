@@ -18,13 +18,16 @@ GitHub 仓库：`Xinhui-1997/personal-learning-workbench`
 
 这个项目当前是：GitHub Pages + PWA + Supabase + ChatGPT 每日内容 Agent。
 
-当前模块：
+常规每天模块：
 - 今日小事
 - Daily English
 - 每日物理
 - 每日心理
 - 每日科普
 - 每日诗词
+
+每周六额外模块：
+- 周六短读（数据库 module=`weekend_read`）：从过去 14 天内新发表、免费可读的人物 / 思想 / 文化文章或随笔中选 1 篇，优先 5–10 分钟原文。该卡由每日 05:30 任务在周六生成并写入 Supabase；周六提醒应读取同一条数据库记录，不要另选文章。
 
 我的要求以仓库、数据库和我这次新说的需求为准，不要依赖已经丢失的旧聊天。
 
@@ -34,6 +37,7 @@ GitHub 仓库：`Xinhui-1997/personal-learning-workbench`
 - GitHub Pages 部署文件
 - Service Worker 缓存
 - 每日自动生成任务
+- 周六短读提醒任务
 
 完成修改后告诉我改了哪些文件、数据库是否改了、是否已部署成功，以及我是否需要手动操作。
 
