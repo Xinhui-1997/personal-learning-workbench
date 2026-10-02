@@ -1,0 +1,84 @@
+name: Test Local AI Learning Cards
+
+on:
+  push:
+    branches:
+      - experiment/local-ai-qwen
+    paths:
+      - ".github/workflows/test-local-ai.yml"
+      - "scripts/test_local_ai.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-qwen-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout experiment branch
+        uses: actions/checkout@v4
+
+      - name: Show runner resources
+        run: |
+          echo "CPU:"
+          nproc
+          echo "Memory:"
+          free -h
+          echo "Disk:"
+          df -h /
+
+      - name: Install Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama --version
+
+      - name: Start Ollama
+        run: |
+          nohup ollama serve >/tmp/ollama.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then
+              echo "Ollama is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/ollama.log
+          exit 1
+
+      - name: Pull Qwen3 1.7B
+        run: |
+          ollama pull qwen3:1.7b
+          ollama list
+
+      - name: Generate four test cards
+        id: generate
+        continue-on-error: true
+        env:
+          OLLAMA_MODEL: qwen3:1.7b
+        run: |
+          python3 scripts/test_local_ai.py
+
+      - name: Show report
+        if: always()
+        run: |
+          if [ -f test-output/report.txt ]; then
+            cat test-output/report.txt
+          else
+            echo "No report was produced."
+          fi
+
+      - name: Upload experiment artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-qwen-learning-card-test
+          path: test-output/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Fail if generation failed
+        if: steps.generate.outcome != 'success'
+        run: exit 1
