@@ -48,16 +48,16 @@ jobs:
           cat /tmp/ollama.log
           exit 1
 
-      - name: Pull Qwen3 1.7B
+      - name: Pull Qwen3 4B Instruct
         run: |
-          ollama pull qwen3:1.7b
+          ollama pull qwen3:4b-instruct
           ollama list
 
       - name: Generate four test cards
         id: generate
         continue-on-error: true
         env:
-          OLLAMA_MODEL: qwen3:1.7b
+          OLLAMA_MODEL: qwen3:4b-instruct
         run: |
           python3 scripts/test_local_ai.py
 
