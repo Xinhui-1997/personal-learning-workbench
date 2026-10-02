@@ -11,6 +11,7 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434/api/chat")
 SOURCES = [
     {
         "module": "english",
+        "meta": "1–2 分钟 · 中英双语",
         "source_name": "NASA Science",
         "source_url": "https://science.nasa.gov/exoplanets/",
         "source_text": (
@@ -21,13 +22,16 @@ SOURCES = [
             "other planetary systems with our own."
         ),
         "instructions": (
-            "Create a 1–2 minute bilingual English-learning card. Use easy English. "
-            "Include: a short Chinese preview, 3–5 English sentences, Chinese explanation, "
-            "three useful expressions, and one sentence to read aloud."
+            "Create a bilingual English-learning card that takes about 1–2 minutes. "
+            "Use easy English suitable for a Chinese learner. The body must contain: "
+            "a short Chinese preview; 3–5 short English sentences; a Chinese explanation; "
+            "three useful English expressions with Chinese meanings; and exactly one short "
+            "English sentence to read aloud."
         ),
     },
     {
         "module": "physics",
+        "meta": "1–2 分钟 · 中文",
         "source_name": "Encyclopaedia Britannica",
         "source_url": "https://www.britannica.com/science/Leidenfrost-effect",
         "source_text": (
@@ -37,12 +41,14 @@ SOURCES = [
             "immediately. Heat transfer, evaporation and fluid motion all contribute."
         ),
         "instructions": (
-            "Create a 1–2 minute Chinese physics card for a curious adult. Explain the mechanism "
-            "accurately and intuitively. One simple formula is optional, not required."
+            "Write the title and body in Simplified Chinese, except necessary scientific terms. "
+            "Create a 1–2 minute physics card for a curious adult. Explain the mechanism accurately "
+            "and intuitively. Keep it compact and avoid unsupported details."
         ),
     },
     {
         "module": "psych",
+        "meta": "1–2 分钟 · 中文",
         "source_name": "The Learning Scientists",
         "source_url": "https://www.learningscientists.org/spaced-practice",
         "source_text": (
@@ -52,13 +58,15 @@ SOURCES = [
             "material, learner and how long the information needs to be remembered."
         ),
         "instructions": (
-            "Create a 1–2 minute Chinese psychology/learning-science card. Clearly distinguish "
-            "a research tendency from an individual guarantee. Include one important limitation "
-            "and one gentle reflection question."
+            "Write the title and body in Simplified Chinese, except the English term spaced practice "
+            "when useful. Create a 1–2 minute psychology/learning-science card. Clearly distinguish "
+            "a general research tendency from an individual guarantee. Include one important "
+            "limitation and one gentle reflection question. Do not invent specific effect sizes."
         ),
     },
     {
         "module": "science",
+        "meta": "1–2 分钟 · 中文",
         "source_name": "Smithsonian Ocean",
         "source_url": "https://ocean.si.edu/ocean-life/invertebrates/octopuses",
         "source_text": (
@@ -68,30 +76,27 @@ SOURCES = [
             "changes in color and pattern for camouflage and signaling."
         ),
         "instructions": (
-            "Create a light but accurate 1–2 minute Chinese science card. Include one section "
-            "called ‘今天的原来如此’ with a memorable takeaway."
+            "Write the title and body in Simplified Chinese, except necessary scientific terms. "
+            "Create a light but accurate 1–2 minute science card. Include one clearly labeled "
+            "section called ‘今天的原来如此’ with a memorable takeaway."
         ),
     },
 ]
 
-SYSTEM = """You are generating one card for a personal daily learning website.
-Use ONLY the supplied source packet. Do not invent facts, article titles, authors, organizations,
-URLs, dates, quotations, or study results. Copy source_name and source_url exactly.
-Return strict JSON only, with these keys:
-module, title, body_html, meta, source_name, source_url, quality_note.
+SYSTEM = """You transform a supplied source packet into one learning card.
+Use ONLY the supplied source packet. Never add facts that are not present in the packet.
+Do not invent quotations, numbers, dates, studies, mechanisms, organizations, or URLs.
+Return strict JSON only with exactly these keys: title, body_html, quality_note.
 body_html may use p, div class=callout, div class=vocab, strong, em, ul, li.
-Do not include hidden scoring fields.
-quality_note is one short sentence describing any uncertainty or simplification.
+Do not use markdown. Do not include source fields, metadata fields, scores, or hidden fields.
+quality_note must be one short sentence and should mention any simplification or uncertainty.
 """
 
 def call_ollama(item):
     prompt = (
         f"MODULE: {item['module']}\n"
-        f"SOURCE_NAME: {item['source_name']}\n"
-        f"SOURCE_URL: {item['source_url']}\n"
         f"SOURCE_PACKET:\n{item['source_text']}\n\n"
         f"TASK:\n{item['instructions']}\n"
-        "meta must be human-readable plain text."
     )
     payload = {
         "model": MODEL,
@@ -103,8 +108,8 @@ def call_ollama(item):
             {"role": "user", "content": prompt},
         ],
         "options": {
-            "temperature": 0.2,
-            "num_predict": 900,
+            "temperature": 0.15,
+            "num_predict": 850,
         },
     }
     req = urllib.request.Request(
@@ -117,24 +122,35 @@ def call_ollama(item):
     with urllib.request.urlopen(req, timeout=300) as resp:
         raw = json.load(resp)
     elapsed = round(time.time() - started, 2)
-    content = raw["message"]["content"]
-    obj = json.loads(content)
-    return obj, elapsed
+    generated = json.loads(raw["message"]["content"])
 
-def validate(item, obj):
+    card = {
+        "module": item["module"],
+        "title": generated.get("title", "").strip(),
+        "body_html": generated.get("body_html", "").strip(),
+        "meta": item["meta"],
+        "source_name": item["source_name"],
+        "source_url": item["source_url"],
+        "quality_note": generated.get("quality_note", "").strip(),
+    }
+    return card, elapsed
+
+def validate(item, card):
     required = [
         "module", "title", "body_html", "meta",
         "source_name", "source_url", "quality_note"
     ]
-    missing = [k for k in required if not obj.get(k)]
+    missing = [k for k in required if not card.get(k)]
     if missing:
         raise ValueError(f"{item['module']}: missing keys/values: {missing}")
-    if obj["module"] != item["module"]:
-        raise ValueError(f"{item['module']}: model changed module to {obj['module']!r}")
-    if obj["source_name"] != item["source_name"]:
-        raise ValueError(f"{item['module']}: source_name was altered")
-    if obj["source_url"] != item["source_url"]:
-        raise ValueError(f"{item['module']}: source_url was altered")
+    if card["module"] != item["module"]:
+        raise ValueError(f"{item['module']}: wrong module")
+    if card["source_name"] != item["source_name"]:
+        raise ValueError(f"{item['module']}: source_name mismatch")
+    if card["source_url"] != item["source_url"]:
+        raise ValueError(f"{item['module']}: source_url mismatch")
+    if card["meta"] != item["meta"]:
+        raise ValueError(f"{item['module']}: meta mismatch")
 
 def main():
     out_dir = Path("test-output")
@@ -146,9 +162,9 @@ def main():
     for item in SOURCES:
         print(f"Generating {item['module']} with {MODEL} ...", flush=True)
         try:
-            obj, elapsed = call_ollama(item)
-            validate(item, obj)
-            results.append(obj)
+            card, elapsed = call_ollama(item)
+            validate(item, card)
+            results.append(card)
             timings[item["module"]] = elapsed
             print(f"  OK in {elapsed}s", flush=True)
         except Exception as exc:
