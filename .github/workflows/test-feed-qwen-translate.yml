@@ -35,7 +35,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ollama/models
-          key: ollama-qwen3-1.7b-v1
+          key: ollama-qwen3-4b-instruct-v1
 
       - name: Install Ollama
         run: |
@@ -56,14 +56,14 @@ jobs:
 
       - name: Ensure Qwen3 1.7B
         run: |
-          ollama pull qwen3:1.7b
+          ollama pull qwen3:4b-instruct
           ollama list
 
       - name: Build four cards
         id: build
         continue-on-error: true
         run: |
-          python scripts/test_feed_qwen_translate.py
+          OLLAMA_MODEL=qwen3:4b-instruct python scripts/test_feed_qwen_translate.py
 
       - name: Show report
         if: always()
