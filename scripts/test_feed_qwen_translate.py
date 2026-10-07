@@ -216,8 +216,13 @@ def translate_exact(text):
     )
     with urllib.request.urlopen(req,timeout=240) as r: raw=json.load(r)
     obj=json.loads(raw["message"]["content"])
-    out=clean(obj.get("translation",""))
-    if not out: raise RuntimeError("empty translation")
+    out=clean(obj.get("translation","") if isinstance(obj,dict) else "")
+    if not out and isinstance(obj,dict):
+        string_values=[v for v in obj.values() if isinstance(v,str) and v.strip()]
+        if len(string_values)==1:
+            out=clean(string_values[0])
+    if not out:
+        raise RuntimeError(f"empty translation; model keys={list(obj) if isinstance(obj,dict) else type(obj).__name__}")
     # Safety guard: numbers must remain equivalent. Chinese translations may
     # legitimately render 600,000 as 60万 or 100,000,000 as 1亿.
     compact_out = out.replace(",", "")
