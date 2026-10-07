@@ -6,7 +6,7 @@ import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import feedparser
 from bs4 import BeautifulSoup
@@ -24,11 +24,6 @@ SOURCE_POOLS = {
             "feed": "https://learningenglish.voanews.com/api/zkm-ql-vomx-tpej-rqi",
             "source_name": "VOA Learning English · As It Is",
             "source_priority": 30,
-        },
-        {
-            "feed": "https://learningenglish.voanews.com/api/z_goqvl-vomx-tpevmmqt",
-            "source_name": "VOA Learning English · What's Trending Today",
-            "source_priority": 20,
         },
         {
             "feed": "https://learningenglish.voanews.com/api/zmg_pl-vomx-tpeymtm",
@@ -69,15 +64,16 @@ META = {
 BLOCK = {
     "english": [
         "war", "election", "president", "minister", "military", "killed", "murder",
-        "sexual", "rape", "assault",
+        "execution", "prison", "sexual", "rape", "assault", "drug crisis", "pregnant",
     ],
     "physics": [
         "nobel", "prize", "award", "wins ", "winner", "obituary", "dies at",
-        "quiz", "podcast", "interview", "jobs", "career", "salary",
+        "quiz", "puzzle", "podcast", "interview", "jobs", "career", "salary",
+        "festival season", "high spirits",
     ],
     "psych": [
         "sexual", "rape", "assault", "violence", "suicide", "self-harm", "abuse",
-        "grief", "authoritarian", "election", "politic", "war", "trauma",
+        "grief", "authoritarian", "election", "politic", "war", "trauma", "calendar",
     ],
     "science": [
         "quiz", "subscription", "sponsored",
@@ -86,13 +82,13 @@ BLOCK = {
 
 PREFER = {
     "english": [
-        "grammar", "word", "phrase", "language", "learn", "science", "technology",
-        "culture", "education", "study", "everyday",
+        "animal", "nature", "science", "technology", "culture", "education", "language",
+        "city", "travel", "food", "environment", "space", "history", "japan",
     ],
     "physics": [
         "quantum", "material", "particle", "laser", "light", "magnet", "energy",
-        "fluid", "wave", "atom", "space", "temperature", "superconduct",
-        "experiment", "physics", "electron", "neutrino", "gravity",
+        "fluid", "atom", "space", "temperature", "superconduct",
+        "experiment", "physics", "electron", "neutrino", "gravity", "fractal",
     ],
     "psych": [
         "attention", "memory", "stress", "emotion", "empathy", "compassion",
@@ -131,8 +127,6 @@ def clean_text(raw):
     soup = BeautifulSoup(html.unescape(str(raw)), "html.parser")
     text = soup.get_text(" ", strip=True)
     text = re.sub(r"\s+", " ", text).strip()
-
-    # Remove common WordPress-style RSS boilerplate without touching article facts.
     text = re.sub(
         r"\s*The post .*? appeared first on .*?\.?\s*$",
         "",
@@ -162,12 +156,11 @@ def first_sentences(text, max_sentences=2, max_chars=520):
     return " ".join(out).strip()[:max_chars].rstrip()
 
 def entry_summary(entry):
-    candidates = [
+    for candidate in [
         entry.get("summary"),
         entry.get("description"),
         entry.get("subtitle"),
-    ]
-    for candidate in candidates:
+    ]:
         text = first_sentences(candidate, 2, 520)
         if len(text) >= 35:
             return text
@@ -202,8 +195,11 @@ def published_datetime(entry):
 def age_days(dt):
     if not dt:
         return 999
-    now = datetime.now(timezone.utc)
-    return max(0, (now - dt).days)
+    return max(0, (datetime.now(timezone.utc) - dt).days)
+
+def blocked(module, text):
+    hay = text.lower()
+    return any(term in hay for term in BLOCK[module])
 
 def score_entry(module, entry, source_priority):
     title = clean_text(entry.get("title", ""))
@@ -213,27 +209,25 @@ def score_entry(module, entry, source_priority):
         return None
 
     hay = (title + " " + summary).lower()
-    if any(term in hay for term in BLOCK[module]):
+    if blocked(module, hay):
         return None
     if any(term in hay for term in ["podcast", "video:", "watch:", "quiz of the week"]):
         return None
 
     dt = published_datetime(entry)
     days = age_days(dt)
-
-    # English must not silently fall back to a years-old dormant feed.
     if module == "english" and days > 90:
         return None
 
     score = source_priority
     score += max(0, 35 - min(days, 35))
     score += sum(5 for term in PREFER[module] if term in hay)
-
-    # Prefer snippets with enough substance but avoid huge feed bodies.
     if 70 <= len(summary) <= 420:
         score += 15
     elif len(summary) > 420:
         score += 5
+    if summary.strip().endswith("?"):
+        score -= 8
 
     return {
         "score": score,
@@ -244,13 +238,11 @@ def score_entry(module, entry, source_priority):
         "age_days": days,
     }
 
-def pick_best(module):
-    candidates = []
-    errors = []
+def pick_rss(module):
+    candidates, errors = [], []
     for source in SOURCE_POOLS[module]:
         try:
-            feed_bytes = fetch(source["feed"])
-            parsed = feedparser.parse(feed_bytes)
+            parsed = feedparser.parse(fetch(source["feed"]))
             if parsed.bozo and not parsed.entries:
                 raise RuntimeError(str(parsed.bozo_exception))
             for entry in parsed.entries[:30]:
@@ -263,16 +255,144 @@ def pick_best(module):
             errors.append(f"{source['feed']}: {exc}")
 
     if not candidates:
-        raise RuntimeError(f"{module}: no usable candidates; errors={errors}")
-
+        raise RuntimeError(f"{module}: no usable RSS candidates; errors={errors}")
     candidates.sort(key=lambda x: x["score"], reverse=True)
     return candidates[0], candidates[:5]
+
+def parse_news_in_levels_article(url):
+    soup = BeautifulSoup(fetch(url), "html.parser")
+    page_text = soup.get_text("\n")
+    lines = [re.sub(r"\s+", " ", x).strip() for x in page_text.splitlines()]
+    lines = [x for x in lines if x]
+
+    title = ""
+    for tag in soup.find_all(["h1", "h2"]):
+        t = clean_text(tag.get_text(" ", strip=True))
+        if "level 2" in t.lower():
+            title = re.sub(r"\s*[–-]\s*level\s*2\s*$", "", t, flags=re.I).strip()
+            break
+    if not title:
+        return None
+
+    date_match = re.search(r"\b(\d{2})-(\d{2})-(\d{4})\s+\d{2}:\d{2}\b", page_text)
+    dt = None
+    if date_match:
+        day, month, year = map(int, date_match.groups())
+        dt = datetime(year, month, day, tzinfo=timezone.utc)
+
+    body_parts = []
+    started = False
+    for line in lines:
+        if not started:
+            if "level 2" in line.lower() and title.lower() in line.lower():
+                started = True
+            continue
+        if re.fullmatch(r"Level [123]", line, flags=re.I):
+            continue
+        if re.fullmatch(r"\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}", line):
+            continue
+        if line.lower().startswith("difficult words:"):
+            break
+        if line.lower().startswith("learn 3000 words"):
+            break
+        if len(line) >= 45:
+            body_parts.append(line)
+        if len(body_parts) >= 3:
+            break
+
+    body = first_sentences(" ".join(body_parts), 2, 430)
+    if len(body) < 50:
+        return None
+
+    difficult = []
+    for tag in soup.find_all(["p", "div"]):
+        t = clean_text(tag.get_text(" ", strip=True))
+        if not t.lower().startswith("difficult words:"):
+            continue
+        payload = t.split(":", 1)[1].strip()
+        # Common shape: term (definition), term (definition), term (definition)
+        for term, definition in re.findall(r"([^,()]{2,40})\s*\(([^()]{3,180})\)", payload):
+            term = term.strip(" ,:;")
+            definition = definition.strip()
+            if term and definition:
+                difficult.append({"term": term, "definition": definition})
+            if len(difficult) >= 3:
+                break
+        if difficult:
+            break
+
+    return {
+        "title_en": title,
+        "summary_en": body,
+        "source_url": url,
+        "published": dt.isoformat() if dt else "",
+        "age_days": age_days(dt),
+        "source_name": "News in Levels · Level 2",
+        "feed": "https://www.newsinlevels.com/",
+        "difficult_words": difficult,
+    }
+
+def pick_news_in_levels():
+    homepage = "https://www.newsinlevels.com/"
+    soup = BeautifulSoup(fetch(homepage), "html.parser")
+    urls = []
+    seen = set()
+    for a in soup.find_all("a", href=True):
+        label = clean_text(a.get_text(" ", strip=True))
+        href = urljoin(homepage, a["href"])
+        if label.lower() != "level 2":
+            continue
+        if "/products/" not in href:
+            continue
+        if href in seen:
+            continue
+        seen.add(href)
+        urls.append(href)
+
+    candidates = []
+    for order, url in enumerate(urls[:14]):
+        try:
+            item = parse_news_in_levels_article(url)
+            if not item:
+                continue
+            hay = (item["title_en"] + " " + item["summary_en"]).lower()
+            if blocked("english", hay):
+                continue
+            if item["age_days"] > 30:
+                continue
+            score = 120 - order * 3
+            score += max(0, 20 - min(item["age_days"], 20))
+            score += sum(5 for term in PREFER["english"] if term in hay)
+            if 100 <= len(item["summary_en"]) <= 430:
+                score += 15
+            item["score"] = score
+            candidates.append(item)
+        except Exception:
+            continue
+
+    if not candidates:
+        raise RuntimeError("News in Levels: no usable Level 2 candidates")
+    candidates.sort(key=lambda x: x["score"], reverse=True)
+    return candidates[0], candidates[:5]
+
+def pick_best(module):
+    if module == "english":
+        errors = []
+        try:
+            return pick_news_in_levels()
+        except Exception as exc:
+            errors.append(str(exc))
+        try:
+            return pick_rss("english")
+        except Exception as exc:
+            errors.append(str(exc))
+        raise RuntimeError("english: all sources failed: " + " | ".join(errors))
+    return pick_rss(module)
 
 class MarianTranslator:
     def __init__(self):
         from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
         import torch
-
         self.torch = torch
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
         self.model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
@@ -282,14 +402,8 @@ class MarianTranslator:
         text = clean_text(text)
         if not text:
             return ""
-        # This multilingual-target Marian model expects the target-language token.
         source = ">>cmn_Hans<< " + text
-        inputs = self.tokenizer(
-            source,
-            return_tensors="pt",
-            truncation=True,
-            max_length=512,
-        )
+        inputs = self.tokenizer(source, return_tensors="pt", truncation=True, max_length=512)
         with self.torch.no_grad():
             generated = self.model.generate(
                 **inputs,
@@ -307,19 +421,16 @@ def polish_zh(text):
     text = text.replace(" ?", "？").replace(" !", "！")
     text = re.sub(r"\s+([，。！？；：])", r"\1", text)
     text = re.sub(r"([，。！？；：])\s+", r"\1", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    return re.sub(r"\s+", " ", text).strip()
 
 def esc(text):
     return html.escape(text or "", quote=True)
 
-def candidate_phrases(text, limit=3):
+def fallback_phrases(text, limit=3):
     tokens = re.findall(r"[A-Za-z]+(?:-[A-Za-z]+)*", text)
-    runs = []
-    current = []
+    runs, current = [], []
     for tok in tokens:
-        low = tok.lower()
-        if low in STOPWORDS:
+        if tok.lower() in STOPWORDS:
             if current:
                 runs.append(current)
                 current = []
@@ -328,28 +439,20 @@ def candidate_phrases(text, limit=3):
     if current:
         runs.append(current)
 
-    scored = []
-    seen = set()
+    scored, seen = [], set()
     for run in runs:
-        # Drop leading proper names from content runs.
         while run and run[0][0].isupper():
             run = run[1:]
-        if not run:
-            continue
         for width in (3, 2, 1):
             if len(run) < width:
                 continue
             for i in range(len(run) - width + 1):
-                chunk = run[i:i+width]
-                phrase = " ".join(chunk)
+                phrase = " ".join(run[i:i+width])
                 key = phrase.lower()
                 if key in seen or len(phrase) < 6:
                     continue
                 seen.add(key)
-                content_score = width * 10 + sum(len(x) for x in chunk)
-                if "-" in phrase:
-                    content_score += 4
-                scored.append((content_score, phrase))
+                scored.append((width * 10 + len(phrase), phrase))
     scored.sort(reverse=True)
     return [p for _, p in scored[:limit]]
 
@@ -358,8 +461,16 @@ def build_card(module, item, tr):
     summary_zh = tr.translate(item["summary_en"])
 
     if module == "english":
-        phrases = candidate_phrases(item["summary_en"], 3)
-        vocab = [(p, tr.translate(p)) for p in phrases]
+        vocab = []
+        for row in item.get("difficult_words", [])[:3]:
+            vocab.append({
+                "term": row["term"],
+                "meaning": tr.translate(row["definition"]),
+            })
+        if not vocab:
+            for phrase in fallback_phrases(item["summary_en"], 3):
+                vocab.append({"term": phrase, "meaning": tr.translate(phrase)})
+
         follow = first_sentences(item["summary_en"], 1, 180)
         body = (
             f'<div class="callout"><strong>先看中文：</strong>{esc(summary_zh)}</div>'
@@ -369,7 +480,8 @@ def build_card(module, item, tr):
         if vocab:
             body += '<div class="vocab"><strong>3 个词 / 表达</strong><ul>'
             body += "".join(
-                f"<li><strong>{esc(p)}</strong> — {esc(m)}</li>" for p, m in vocab
+                f'<li><strong>{esc(v["term"])}</strong> — {esc(v["meaning"])}</li>'
+                for v in vocab
             )
             body += "</ul></div>"
         body += f'<div class="callout"><strong>跟读一句：</strong>{esc(follow)}</div>'
@@ -409,10 +521,8 @@ def main():
     out_dir = Path("test-output-marian")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    selected = {}
-    top_candidates = {}
-    failures = []
-    fetch_timings = {}
+    selected, top_candidates = {}, {}
+    failures, fetch_timings = [], {}
 
     for module in ["english", "physics", "psych", "science"]:
         t0 = time.time()
@@ -434,8 +544,7 @@ def main():
     translator = MarianTranslator()
     model_load_seconds = round(time.time() - model_t0, 2)
 
-    cards = []
-    translate_timings = {}
+    cards, translate_timings = [], {}
     for module, item in selected.items():
         t0 = time.time()
         try:
