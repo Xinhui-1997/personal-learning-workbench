@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import html
 import json
+import os
 import re
 import time
 import urllib.request
@@ -12,7 +13,7 @@ import feedparser
 from bs4 import BeautifulSoup
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
-MODEL = "qwen3:1.7b"
+MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:1.7b")
 
 RSS = {
     "physics": ("https://physicsworld.com/feed/", "Physics World"),
