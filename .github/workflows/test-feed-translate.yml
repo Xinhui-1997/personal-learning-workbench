@@ -1,0 +1,63 @@
+name: Test RSS + Offline Translation
+
+on:
+  push:
+    branches:
+      - experiment/local-ai-qwen
+    paths:
+      - ".github/workflows/test-feed-translate.yml"
+      - "scripts/test_feed_translate.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  feed-translate-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ARGOS_DEVICE_TYPE: cpu
+
+    steps:
+      - name: Checkout experiment branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install deterministic pipeline dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "argostranslate==1.10.0" "feedparser==6.0.12" "beautifulsoup4==4.14.2"
+
+      - name: Fetch feeds, translate locally, build cards
+        id: build
+        continue-on-error: true
+        run: |
+          python scripts/test_feed_translate.py
+
+      - name: Show report
+        if: always()
+        run: |
+          if [ -f test-output-feed/report.txt ]; then
+            cat test-output-feed/report.txt
+          else
+            echo "No report produced."
+          fi
+
+      - name: Upload deterministic experiment
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rss-offline-translation-test
+          path: test-output-feed/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Fail if pipeline incomplete
+        if: steps.build.outcome != 'success'
+        run: exit 1
