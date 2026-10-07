@@ -203,7 +203,7 @@ def translate_exact(text):
         "model":MODEL,"stream":False,"think":False,"format":"json",
         "messages":[
             {"role":"system","content":
-             "You are a literal English-to-Simplified-Chinese translator. Translate only. "
+             "You are a faithful English-to-Simplified-Chinese translator. Use natural, idiomatic Chinese while preserving the exact meaning. Translate only. "
              "Do not summarize, explain, expand, omit facts, add examples, or add background knowledge. "
              "Preserve all numbers, proper nouns, scientific terms, qualifiers, uncertainty words, and sentence meaning. "
              "Return JSON with exactly one key: translation."},
@@ -218,9 +218,23 @@ def translate_exact(text):
     obj=json.loads(raw["message"]["content"])
     out=clean(obj.get("translation",""))
     if not out: raise RuntimeError("empty translation")
-    # Simple safety guard: if source contains Arabic numbers, translated output must preserve them.
-    for num in re.findall(r"\d+(?:\.\d+)?",text):
-        if num not in out:
+    # Safety guard: numbers must remain equivalent. Chinese translations may
+    # legitimately render 600,000 as 60万 or 100,000,000 as 1亿.
+    compact_out = out.replace(",", "")
+    compact_src = text.replace(",", "")
+    for num in re.findall(r"\d+(?:\.\d+)?", compact_src):
+        if num in compact_out:
+            continue
+        try:
+            value = float(num)
+        except ValueError:
+            raise RuntimeError(f"translation dropped number {num}")
+        alternatives = []
+        if value.is_integer() and int(value) >= 10000 and int(value) % 10000 == 0:
+            alternatives.append(f"{int(value)//10000}万")
+        if value.is_integer() and int(value) >= 100000000 and int(value) % 100000000 == 0:
+            alternatives.append(f"{int(value)//100000000}亿")
+        if not any(a in compact_out for a in alternatives):
             raise RuntimeError(f"translation dropped number {num}")
     return out
 
