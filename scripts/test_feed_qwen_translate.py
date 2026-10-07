@@ -200,44 +200,40 @@ def pick_english():
 
 def translate_exact(text):
     payload={
-        "model":MODEL,"stream":False,"think":False,"format":"json",
+        "model":MODEL,"stream":False,"think":False,
         "messages":[
             {"role":"system","content":
-             "You are a faithful English-to-Simplified-Chinese translator. Use natural, idiomatic Chinese while preserving the exact meaning. Translate only. "
-             "Do not summarize, explain, expand, omit facts, add examples, or add background knowledge. "
-             "Preserve all numbers, proper nouns, scientific terms, qualifiers, uncertainty words, and sentence meaning. "
-             "Return JSON with exactly one key: translation."},
-            {"role":"user","content":"Translate this exact text into natural Simplified Chinese:\n"+text}
+             "Translate English to natural Simplified Chinese. Return ONLY the Chinese translation, with no label, no quotation marks, no explanation, and no extra text. "
+             "Do not summarize, expand, omit facts, add examples, or add background knowledge. "
+             "Preserve all numbers, proper nouns, scientific terms, qualifiers, uncertainty words, and sentence meaning."},
+            {"role":"user","content":text}
         ],
         "options":{"temperature":0.0,"num_predict":600}
     }
     req=urllib.request.Request(
         OLLAMA_URL,data=json.dumps(payload).encode(),headers={"Content-Type":"application/json"},method="POST"
     )
-    with urllib.request.urlopen(req,timeout=240) as r: raw=json.load(r)
-    obj=json.loads(raw["message"]["content"])
-    out=clean(obj.get("translation","") if isinstance(obj,dict) else "")
-    if not out and isinstance(obj,dict):
-        string_values=[v for v in obj.values() if isinstance(v,str) and v.strip()]
-        if len(string_values)==1:
-            out=clean(string_values[0])
+    with urllib.request.urlopen(req,timeout=240) as r:
+        raw=json.load(r)
+    out=clean(raw.get("message",{}).get("content",""))
+    out=re.sub(r"^(?:翻译|译文|中文翻译)\s*[:：]\s*","",out).strip()
     if not out:
-        raise RuntimeError(f"empty translation; model keys={list(obj) if isinstance(obj,dict) else type(obj).__name__}")
-    # Safety guard: numbers must remain equivalent. Chinese translations may
-    # legitimately render 600,000 as 60万 or 100,000,000 as 1亿.
+        raise RuntimeError("empty translation")
+    if len(out) > max(80, len(text)*3):
+        raise RuntimeError("translation unexpectedly long")
     compact_out = out.replace(",", "")
     compact_src = text.replace(",", "")
     for num in re.findall(r"\d+(?:\.\d+)?", compact_src):
         if num in compact_out:
             continue
         try:
-            value = float(num)
+            value=float(num)
         except ValueError:
             raise RuntimeError(f"translation dropped number {num}")
-        alternatives = []
-        if value.is_integer() and int(value) >= 10000 and int(value) % 10000 == 0:
+        alternatives=[]
+        if value.is_integer() and int(value)>=10000 and int(value)%10000==0:
             alternatives.append(f"{int(value)//10000}万")
-        if value.is_integer() and int(value) >= 100000000 and int(value) % 100000000 == 0:
+        if value.is_integer() and int(value)>=100000000 and int(value)%100000000==0:
             alternatives.append(f"{int(value)//100000000}亿")
         if not any(a in compact_out for a in alternatives):
             raise RuntimeError(f"translation dropped number {num}")
